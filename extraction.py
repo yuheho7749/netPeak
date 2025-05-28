@@ -1,25 +1,56 @@
 import os
-import re
 import pandas as pd
+import json
+import gzip
 
-downloads_df = None
+speeds_df = None
+valid_tests = 0
 
-for test in os.listdir('./data/raw'):
-  if not os.path.exists(f'./data/raw/{test}/out.txt'):
-    print(f'No out.txt in {test}')
+for test in os.listdir('./data'):
+  if not os.path.exists(f'./data/{test}/ndt7'):
+    print(f'Skipping {test}, no ndt7 directory found')
     continue
-  with open(f'./data/raw/{test}/out.txt', 'r') as f:
-    lines = f.readlines()
-    download_line = [line for line in lines if line.strip().startswith('Throughput:') ][0].strip()
-    match = re.search(r'Throughput:\s+(\d+(\.\d+)?)', download_line)
-    if match:
-      throughput = float(match.group(1))
-      df = pd.DataFrame({'test': test, 'download_mbps': throughput}, index=[0])
-      if downloads_df is None:
-        downloads_df = df
+  filename = None
+  compressed = False
+  for ndt7_file in os.listdir(f'./data/{test}/ndt7'):
+    if ndt7_file.startswith('ndt7-download') and ndt7_file.endswith('.json') or ndt7_file.endswith('.json.gz'):
+      compressed = ndt7_file.endswith('.json.gz')
+      filename = ndt7_file
+      break
+  if filename is None:
+    print(f'No ndt7-download file found in {test}')
+    continue
+  with (gzip.open(f'./data/{test}/ndt7/{filename}', 'rt') if compressed else open(f'./data/{test}/ndt7/{filename}', 'r')) as f:
+    data = json.load(f)
+    if not data.get('Download') or not data.get('Download').get('ServerMeasurements'):
+      continue
+    measurements = data['Download']['ServerMeasurements']
+    last_measurement = measurements[-1]
+    speed = last_measurement['TCPInfo']['BytesAcked'] / last_measurement['TCPInfo']['ElapsedTime'] * 8
+    if speed is None:
+      print(f'No speed data found in {test}')
+      continue
+    
+    valid_tests += 1
+    for measurement in measurements:
+      row = {
+        'TestID': valid_tests,
+        'ElapsedTime': measurement['TCPInfo']['ElapsedTime'],
+        'BytesSent': measurement['TCPInfo']['BytesSent'],
+        'BytesAcked': measurement['TCPInfo']['BytesAcked'],
+        'BytesRetrans': measurement['TCPInfo']['BytesRetrans'],
+        'RTT': measurement['TCPInfo']['RTT'],
+        'RTTVar': measurement['TCPInfo']['RTTVar'],
+        'RWndLimited': measurement['TCPInfo']['RWndLimited'],
+        'SndBufLimited': measurement['TCPInfo']['SndBufLimited'],
+        'MinRTT': measurement['TCPInfo']['MinRTT'],
+        'FinalSpeed': speed
+      }
+      df = pd.DataFrame([row])
+      if speeds_df is None:
+        speeds_df = df
       else:
-        downloads_df = pd.concat([downloads_df, df], ignore_index=True)
-    else:
-      print(f'No throughput found in {test}')
-      
-downloads_df.to_csv('./data/speeds.csv', index=False)
+        speeds_df = pd.concat([speeds_df, df], ignore_index=True)
+        
+print(f'Valid: {valid_tests}, Total: {len(os.listdir("./data"))}')
+speeds_df.to_csv('./dataset.csv', index=False)
