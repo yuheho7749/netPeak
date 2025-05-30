@@ -9,6 +9,8 @@ class ThroughputPredictor(nn.Module):
       nn.ReLU(),
       nn.Linear(hidden_dim, hidden_dim),
       nn.ReLU(),
+      nn.Linear(hidden_dim, hidden_dim),
+      nn.ReLU(),
       nn.Linear(hidden_dim, 1),
     )
 
@@ -20,7 +22,7 @@ class ThroughputPredictor(nn.Module):
     self.device = device
     return self
   
-  def fit(self, X, y, epochs=100, batch_size=16, learning_rate=0.01):
+  def fit(self, X, y, epochs=100, batch_size=16, learning_rate=0.001):
     dataset = torch.utils.data.TensorDataset(torch.tensor(X, dtype=torch.float32, device=self.device), torch.tensor(y, dtype=torch.float32, device=self.device))
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     criterion = nn.MSELoss()
