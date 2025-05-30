@@ -2,45 +2,91 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 class Terminator(nn.Module):
-    def __init__(self, input_dim):
+    def __init__(self, input_dim, hidden_dim=64):
         super(Terminator, self).__init__()
         # TEMP: Testing stub
         self.net = nn.Sequential(
-            nn.Linear(input_dim, 16),
+            nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(16, 8),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(8, 1),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
             nn.Sigmoid()
         )
 
     def forward(self, x):
         return self.net(x)
 
-def train(model, device, dataset, optimizer, epoch, batch_size, learning_rate):
+def train(model, device, dataloader, optimizer, criterion, tolerance, epochs):
     model.train()
-    # TODO:
+    for epoch in range(epochs):
+        total_loss = 0.0
+        for features, labels in dataloader:
+            optimizer.zero_grad()
+            outputs = model(features)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
 
+        print(f'Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(dataloader)}')
 
-def test(model, device, dataset):
+# NOTE: FOOBARed rn
+def test(model, device, dataloader, criterion, tolerance):
     model.eval()
-    test_loss = 0
     correct = 0
-    # TODO:
+    total = 0
+    loss = 0.0
+    with torch.no_grad():
+        for features, labels in dataloader:
+            outputs = model(features)
+            loss += criterion(outputs, labels)
+    # TODO: FOOBARed
+            predictions = (outputs > 0.5).int()
+            binary_targets = (labels < tolerance).float().view(-1, 1)
+            correct += (binary_targets == predictions).sum().item()
+            total += labels.size(0)
+    print('\nTest set: Accuracy: {}/{} ({:.0f}%)\n'.format(
+        correct, total,
+        100. * correct / total))
+    return correct, total
 
-def predict(model):
+def predict(model, device, dataset):
     model.eval()
-    # TODO:
+    with torch.no_grad():
+      return model(torch.tensor(dataset, dtype=torch.float32, device=device)).cpu().view(-1).numpy()
 
-def load_data():
-    # TODO:
-    pass
+def generate_dataloaders(file_path, args, device):
+    df = pd.read_csv(file_path).dropna()
+    # TODO: Change the labels (WTF am I doing)
+    labels = df.pop('PercentError')
+    features = df
+    # print(features)
+    # print(labels)
+    X, y = features.values, labels.values
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    train_dataset = torch.utils.data.TensorDataset(torch.tensor(X_train_scaled, dtype=torch.float32, device=device), torch.tensor(y_train, dtype=torch.float32, device=device))
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+
+    test_dataset = torch.utils.data.TensorDataset(torch.tensor(X_test_scaled, dtype=torch.float32, device=device), torch.tensor(y_test, dtype=torch.float32, device=device))
+    test_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    return df, labels, X_train, X_test, y_train, y_test, train_dataset, train_dataloader, test_dataset, test_dataloader
 
 def main():
     parser = argparse.ArgumentParser(description='Terminator')
-    parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=16, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
@@ -50,8 +96,8 @@ def main():
                         help='disables dGPU training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--speed-tolerance', type=float, default=0.05, metavar='T',
-                        help='acceptable tolerance between predicted and actual download speed (default: 0.05')
+    parser.add_argument('--speed-tolerance', type=float, default=5, metavar='T',
+                        help='acceptable tolerance (percent) between predicted and actual download speed (default: 5')
 
     args = parser.parse_args()
     use_gpu = not args.no_gpu and torch.cuda.is_available
@@ -64,15 +110,24 @@ def main():
     # NOTE:
     # Input is the estimated download speed and duration of speed test (aka cost of speed test)
     # Output is binary output 0 or 1 to continue or terminate the speed test
+    # TEMP:
     # Ground truth: abs(estimated - actual) <= tolerance, the tolerance is set by the human for now
 
     # TODO: Load data and create model
-    input_dim = 42 # TEMP: STUB
-    model = Terminator(input_dim).to(device)
+    features, labels, train_dataset, X_train, X_test, y_train, y_test, train_dataloader, test_dataset, test_dataloader = generate_dataloaders('./terminator_dataset.csv', args, device)
+    print(len(features.columns))
+    model = Terminator(len(features.columns)).to(device)
 
-
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    criterion = nn.MSELoss()
 
     # TODO: Train and test model
+    # tolerance = args.speed_tolerance
+    tolerance = 20.0  # TEMP:
+    train(model, device, train_dataloader, optimizer, criterion, tolerance, args.epochs)
+
+    test(model, device, test_dataloader, criterion, tolerance)
+    # pred = predict(model, device, test_dataset)
 
 
 if __name__ == "__main__":
