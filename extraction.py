@@ -61,12 +61,16 @@ def generate_from_tcpinfo_traces():
     if not os.path.exists(f'./data/{test}/tcpinfo/trace.csv'):
       print(f'Skipping {test}, no trace.csv file found')
       continue
+    
     valid_tests += 1
     trace_df = pd.read_csv(f'./data/{test}/tcpinfo/trace.csv').iloc[1:]
     trace_df['TestID'] = valid_tests
     trace_df['ElapsedTime'] = ((pd.to_datetime(trace_df['Timestamp']) - pd.to_datetime(trace_df['Timestamp'].iloc[0])).dt.total_seconds() * 1_000_000).astype(int)
+    trace_df = trace_df[trace_df['ElapsedTime'] <= 10_000_000]
     trace_df['FinalSpeed'] = trace_df['TCP.BytesAcked'].astype(float).iloc[-1] / trace_df['ElapsedTime'].astype(float).iloc[-1] * 8
+    
     df = trace_df[['TestID', 'ElapsedTime']].copy()
+    df['BusyTime'] = trace_df['TCP.BusyTime'].astype(int)
     df['BytesSent'] = trace_df['TCP.BytesSent'].astype(int)
     df['BytesAcked'] = trace_df['TCP.BytesAcked'].astype(int)
     df['BytesRetrans'] = trace_df['TCP.BytesRetrans'].astype(int)
@@ -77,6 +81,7 @@ def generate_from_tcpinfo_traces():
     df['MinRTT'] = trace_df['TCP.MinRTT'].astype(int)
     df['FinalSpeed'] = trace_df['FinalSpeed'].astype(float)
     df = df.iloc[1:]
+    
     if speeds_df is None:
       speeds_df = df
     else:
