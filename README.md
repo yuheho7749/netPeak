@@ -7,6 +7,7 @@ Under the hood, we treat throughput estimation as a regression problem. Given a 
 
 Once we have a regression model trained, we take the predicted values for our dataset and compare them with the ground-truth speeds, labeling a test as capable of being terminated early if the prediction is close to the final recorded value. This augmented dataset serves as the basis for a classification problem, where we try to determine whether or not to terminate mid-test. We use TRUSTEE‑style post‑hoc reports to verify that each model’s decisions rest on sensible cues.
 
+
 ## TEMP: Running the "Terminator"
 The "Terminator" estimates the confidence of a speed test estimate and outputs a number between 0 (continue) or 1 (terminate) the speed test. In other words, an output closer to 1 means the system is fairly confident with the estimated speed and can terminate early.
 
@@ -15,3 +16,4 @@ The "Terminator" estimates the confidence of a speed test estimate and outputs a
 2. Run the `terminator.py` script to train and validate the "Terminator". An example is shown below:
 ![run-terminator-image](./images/run-terminator.png)
 ![terminator-result-image](./images/terminator-results.png)
+
