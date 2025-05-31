@@ -108,10 +108,9 @@ def main():
         device = torch.device("cpu")
 
     # NOTE:
-    # Input is the estimated download speed and duration of speed test (aka cost of speed test)
+    # Input is the same as input to predictor plus the predicted download speed
+    # Ground truth is (1 - percent_error), so a low percent error will result in a value close to 1 (terminate the predictor
     # Output is binary output 0 or 1 to continue or terminate the speed test
-    # TEMP:
-    # Ground truth: abs(estimated - actual) <= tolerance, the tolerance is set by the human for now
 
     # TODO: Load data and create model
     features, labels, train_dataset, X_train, X_test, y_train, y_test, train_dataloader, test_dataset, test_dataloader = generate_dataloaders('./terminator_dataset.csv', args, device)

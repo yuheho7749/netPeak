@@ -63,14 +63,17 @@ regression.fit(X_train, y_train, epochs=1000, batch_size=16, learning_rate=0.001
 
 X = scaler.fit_transform(X)
 y_pred = regression.predict(X)
-percent_error = np.abs((y_pred - y) / y) * 100
+percent_error = np.abs((y_pred - y) / y)
 # print(percent_error)
 # print(len(percent_error))
 
-df = features[["k"]].copy()
-df["FinalSpeed"] = labels
+# df = features[["k"]].copy()
+df = features.copy()
 df["EstimatedSpeed"] = y_pred
-df["PercentError"] = percent_error
+# df["FinalSpeed"] = labels
+# TODO: (1 - percent_error) to match sigmoid function
+# 1 mean the predictor should stop
+# df["PercentError"] = percent_error
 # print(df)
 
 df.to_csv("./terminator_dataset.csv", index=False)
