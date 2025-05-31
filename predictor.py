@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import pandas as pd
 
 class ThroughputPredictor(nn.Module):
   def __init__(self, num_features, hidden_dim=64):
@@ -47,6 +48,10 @@ class ThroughputPredictor(nn.Module):
     self.eval()
     with torch.no_grad():
       return self(torch.tensor(X, dtype=torch.float32, device=self.device)).cpu().view(-1).numpy()
+    
+  def predict_trustee(self, X: pd.DataFrame):
+    predictions = self.predict(X.to_numpy())
+    return pd.Series(predictions, index=X.index if isinstance(X, pd.DataFrame) else None)
 
   def fit_predict(self, X, y, epochs=100, batch_size=16, learning_rate=0.01):
     self.fit(X, y, epochs, batch_size, learning_rate)
