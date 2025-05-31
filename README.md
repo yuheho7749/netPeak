@@ -7,11 +7,13 @@ Under the hood, we treat throughput estimation as a regression problem. Given a 
 
 Once we have a regression model trained, we take the predicted values for our dataset and compare them with the ground-truth speeds, labeling a test as capable of being terminated early if the prediction is close to the final recorded value. This augmented dataset serves as the basis for a classification problem, where we try to determine whether or not to terminate mid-test. We use TRUSTEE‑style post‑hoc reports to verify that each model’s decisions rest on sensible cues.
 
+## Running the "Predictor"
+Running the notebook `pipeline.ipynb` will perform an example training of the throughput predictor. We collect TCP_INFO statistics every 100ms and use the past 5 snapshots for prediction. The notebook outputs a CDF of percent error relative to the true recorded speed for all snapshots and the average error as the elapsed time continues. We also output a top-k Trustee decision tree for the predictor, using `k=5`. The notebook depends on graphviz, pytorch, scikit-learn, matplotlib, pandas, and trustee.
 
-## TEMP: Running the "Terminator"
+## Running the "Terminator"
 The "Terminator" estimates the confidence of a speed test estimate and outputs a number between 0 (continue) or 1 (terminate) the speed test. In other words, an output closer to 1 means the system is fairly confident with the estimated speed and can terminate early.
 
-### Steps to use the "Terminator" scripts (will probably be integrated to the jupyter notebook for better clarity)
+### Steps to use the "Terminator" scripts
 1. Run the `generate_terminator_dataset.py` to use the **ThroughputPredictor** to generate estimated download speeds. The ground truth is generated from the percent error (1 - clamped(percent_error, max=1)). A high percent error will yield in 0 confidence and vice versa.
 2. Run the `terminator.py` script to train and validate the "Terminator". An example is shown below:
 ![run-terminator-image](./images/run-terminator.png)

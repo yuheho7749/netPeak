@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 class ThroughputPredictor(nn.Module):
   def __init__(self, num_features, hidden_dim=64):
@@ -14,6 +15,7 @@ class ThroughputPredictor(nn.Module):
       nn.ReLU(),
       nn.Linear(hidden_dim, 1),
     )
+    self.scaler = StandardScaler()
 
   def forward(self, x):
     return self.stack(x)
@@ -24,7 +26,7 @@ class ThroughputPredictor(nn.Module):
     return self
   
   def fit(self, X, y, epochs=100, batch_size=16, learning_rate=0.001):
-    dataset = torch.utils.data.TensorDataset(torch.tensor(X, dtype=torch.float32, device=self.device), torch.tensor(y, dtype=torch.float32, device=self.device))
+    dataset = torch.utils.data.TensorDataset(torch.tensor(self.scaler.fit_transform(X), dtype=torch.float32, device=self.device), torch.tensor(y, dtype=torch.float32, device=self.device))
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
@@ -47,7 +49,7 @@ class ThroughputPredictor(nn.Module):
   def predict(self, X):
     self.eval()
     with torch.no_grad():
-      return self(torch.tensor(X, dtype=torch.float32, device=self.device)).cpu().view(-1).numpy()
+      return self(torch.tensor(self.scaler.transform(X), dtype=torch.float32, device=self.device)).cpu().view(-1).numpy()
     
   def predict_trustee(self, X: pd.DataFrame):
     predictions = self.predict(X.to_numpy())

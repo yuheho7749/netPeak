@@ -20,9 +20,18 @@ class Terminator(nn.Module):
             nn.Linear(hidden_dim, 1),
             nn.Sigmoid()
         )
+        
+    def to(self, device):
+        super().to(device)
+        self.device = device
+        return self
 
     def forward(self, x):
         return self.net(x)
+  
+    def predict_trustee(self, X: pd.DataFrame):
+        predictions = predict(self, self.device, X.to_numpy())
+        return pd.Series(predictions, index=X.index if isinstance(X, pd.DataFrame) else None)
 
 def train(model, device, dataloader, optimizer, criterion, tolerance, epochs):
     model.train()
@@ -58,7 +67,7 @@ def predict(model, device, dataset):
     with torch.no_grad():
       return model(torch.tensor(dataset, dtype=torch.float32, device=device)).cpu().view(-1).numpy()
 
-def generate_dataloaders(file_path, args, device):
+def generate_dataloaders(file_path, batch_size, device):
     df = pd.read_csv(file_path).dropna()
     ground_truth = df.pop('FinalSpeed')
     labels = df.pop('StopPredict')
@@ -73,10 +82,10 @@ def generate_dataloaders(file_path, args, device):
     X_test_scaled = scaler.transform(X_test)
 
     train_dataset = torch.utils.data.TensorDataset(torch.tensor(X_train_scaled, dtype=torch.float32, device=device), torch.tensor(y_train, dtype=torch.float32, device=device))
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     test_dataset = torch.utils.data.TensorDataset(torch.tensor(X_test_scaled, dtype=torch.float32, device=device), torch.tensor(y_test, dtype=torch.float32, device=device))
-    test_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    test_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     return df, labels, X_train, X_test, y_train, y_test, train_dataset, train_dataloader, test_dataset, test_dataloader
 
 def main():
@@ -108,7 +117,7 @@ def main():
     # Output is sigmoid output continue (0) or terminate (1) the speed test
 
     # Load data and create model
-    features, labels, train_dataset, X_train, X_test, y_train, y_test, train_dataloader, test_dataset, test_dataloader = generate_dataloaders('./terminator_dataset.csv', args, device)
+    features, labels, train_dataset, X_train, X_test, y_train, y_test, train_dataloader, test_dataset, test_dataloader = generate_dataloaders('./terminator_dataset.csv', args.batch_size, device)
     print(len(features.columns))
     model = Terminator(len(features.columns)).to(device)
 
