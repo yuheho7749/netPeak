@@ -14,4 +14,4 @@ The "Terminator" estimates the confidence of a speed test estimate and outputs a
 1. Run the `generate_terminator_dataset.py` to use the **ThroughputPredictor** to generate estimated download speeds. The ground truth is generated from the percent error (1 - clamped(percent_error, max=1)). A high percent error will yield in 0 confidence and vice versa.
 2. Run the `terminator.py` script to train and validate the "Terminator". An example is shown below:
 ![run-terminator-image](./images/run-terminator.png)
-![terminator-result-image](./images/terminator-results.png.png)
+![terminator-result-image](./images/terminator-results.png)
