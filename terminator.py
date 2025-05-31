@@ -92,7 +92,7 @@ def main():
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('--speed-tolerance', type=float, default=0.05, metavar='T',
-                        help='acceptable tolerance (percent) between predicted and actual download speed (default: 0.05')
+                        help='acceptable confidence level tolerance (percent) of whether to continue to stop the test (default: 0.05')
 
     args = parser.parse_args()
     use_gpu = not args.no_gpu and torch.cuda.is_available
