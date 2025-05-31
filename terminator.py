@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 class Terminator(nn.Module):
     def __init__(self, input_dim, hidden_dim=64):
         super(Terminator, self).__init__()
-        # TEMP: Testing stub
+        # NOTE: Simple nn
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -30,7 +30,7 @@ def train(model, device, dataloader, optimizer, criterion, tolerance, epochs):
         total_loss = 0.0
         for features, labels in dataloader:
             optimizer.zero_grad()
-            outputs = model(features)
+            outputs = model(features).squeeze()
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -38,7 +38,6 @@ def train(model, device, dataloader, optimizer, criterion, tolerance, epochs):
 
         print(f'Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(dataloader)}')
 
-# NOTE: FOOBARed rn
 def test(model, device, dataloader, criterion, tolerance):
     model.eval()
     correct = 0
@@ -46,16 +45,12 @@ def test(model, device, dataloader, criterion, tolerance):
     loss = 0.0
     with torch.no_grad():
         for features, labels in dataloader:
-            outputs = model(features)
+            outputs = model(features).squeeze()
             loss += criterion(outputs, labels)
-    # TODO: FOOBARed
-            predictions = (outputs > 0.5).int()
-            binary_targets = (labels < tolerance).float().view(-1, 1)
-            correct += (binary_targets == predictions).sum().item()
-            total += labels.size(0)
-    print('\nTest set: Accuracy: {}/{} ({:.0f}%)\n'.format(
-        correct, total,
-        100. * correct / total))
+            relative_error = (torch.abs(outputs - labels) / labels) <= tolerance
+            correct += (relative_error).sum().item()
+            total += labels.numel()
+    print('\nTest set: Accuracy: {}/{} ({:.0f}%)\n'.format(correct, total, 100. * correct / total))
     return correct, total
 
 def predict(model, device, dataset):
@@ -65,11 +60,11 @@ def predict(model, device, dataset):
 
 def generate_dataloaders(file_path, args, device):
     df = pd.read_csv(file_path).dropna()
-    # TODO: Change the labels (WTF am I doing)
-    labels = df.pop('PercentError')
+    ground_truth = df.pop('FinalSpeed')
+    labels = df.pop('StopPredict')
     features = df
-    # print(features)
-    # print(labels)
+    print(features)
+    print(labels)
     X, y = features.values, labels.values
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
 
@@ -90,14 +85,14 @@ def main():
                         help='input batch size for training (default: 64)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
-    parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
-                        help='learning rate (default: 1.0)')
+    parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
+                        help='learning rate (default: 0.01)')
     parser.add_argument('--no-gpu', action='store_true', default=False,
                         help='disables dGPU training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--speed-tolerance', type=float, default=5, metavar='T',
-                        help='acceptable tolerance (percent) between predicted and actual download speed (default: 5')
+    parser.add_argument('--speed-tolerance', type=float, default=0.05, metavar='T',
+                        help='acceptable tolerance (percent) between predicted and actual download speed (default: 0.05')
 
     args = parser.parse_args()
     use_gpu = not args.no_gpu and torch.cuda.is_available
@@ -109,10 +104,10 @@ def main():
 
     # NOTE:
     # Input is the same as input to predictor plus the predicted download speed
-    # Ground truth is (1 - percent_error), so a low percent error will result in a value close to 1 (terminate the predictor
-    # Output is binary output 0 or 1 to continue or terminate the speed test
+    # Ground truth is generated with 1 - upper_clamp(percent_error)
+    # Output is sigmoid output continue (0) or terminate (1) the speed test
 
-    # TODO: Load data and create model
+    # Load data and create model
     features, labels, train_dataset, X_train, X_test, y_train, y_test, train_dataloader, test_dataset, test_dataloader = generate_dataloaders('./terminator_dataset.csv', args, device)
     print(len(features.columns))
     model = Terminator(len(features.columns)).to(device)
@@ -120,9 +115,8 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.MSELoss()
 
-    # TODO: Train and test model
-    # tolerance = args.speed_tolerance
-    tolerance = 20.0  # TEMP:
+    # Train and test model
+    tolerance = args.speed_tolerance
     train(model, device, train_dataloader, optimizer, criterion, tolerance, args.epochs)
 
     test(model, device, test_dataloader, criterion, tolerance)
